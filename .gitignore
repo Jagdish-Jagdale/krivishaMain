@@ -1,0 +1,110 @@
+# CodeIgniter
+application/cache/*
+application/logs/*
+!application/logs/index.html
+!application/cache/index.html
+
+# Composer
+vendor/
+composer.lock
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+application/logs/*
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+*~
+
+# Upload directories (keep structure but ignore contents)
+assets/uploads/*
+!assets/uploads/.gitkeep
+
+# Database files
+*.sql.bak
+*.sql.gz
+*.sql.zip
+
+# Node modules (if using npm/npm packages)
+node_modules/
+package-lock.json
+
+# Built files
+dist/
+build/
+
+# PHP Debug
+xdebug.profiler.*
+.phpunit.result.cache
+
+# PhpStorm
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Notepad++
+.npp_backup
+
+# Local configuration files
+application/config/database.php.local
+application/config/config.php.local
+
+# Test coverage
+coverage/
+.coverage
+
+# System files
+.htaccess.local
+web.config.local
+
+# Application specific
+krivisha.sql.bak
+debug_api.txt.bak
+page_response.html.bak
+test_*.php.bak
+
+# User uploads
+user_uploads/
+temp/
+cache/
+
+# Development files
+*.pem
+*.key
+*.crt

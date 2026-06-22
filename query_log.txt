@@ -1,0 +1,43 @@
+SELECT COUNT(tbl_auto_task_list.id) as total_count
+FROM `tbl_auto_task_list`
+LEFT JOIN `user_data` AS `employee_user` ON `tbl_auto_task_list`.`employee_id` = `employee_user`.`id`
+LEFT JOIN `user_data` AS `assign_user` ON `tbl_auto_task_list`.`assign_to_id` = `assign_user`.`id`
+LEFT JOIN `tbl_krivisha_department` ON `tbl_krivisha_department`.`id` = `tbl_auto_task_list`.`department_id`
+LEFT JOIN `tbl_customers` ON `tbl_auto_task_list`.`party_id` = `tbl_customers`.`id`
+WHERE `tbl_auto_task_list`.`order_department` IN('1', '2')
+AND `tbl_auto_task_list`.`is_deleted` = '0'
+AND tbl_auto_task_list.task_id NOT IN (SELECT order_id FROM tbl_order_details WHERE order_status IN ('5','6') AND is_deleted = '0')
+AND `tbl_auto_task_list`.`department_id` = '25'
+AND `tbl_auto_task_list`.`order_status` = '4'
+
+stdClass Object
+(
+    [id] => 4876
+    [plant_id] => 3
+    [task_id] => ORD-2456
+    [order_department] => 1
+    [employee_id] => 4
+    [date] => 2026-06-18
+    [task_status] => 2
+    [task_action] => 2
+    [details_of_task] => Order Closed Fully Dispatched
+    [department_id] => 25
+    [assign_to_id] => 7
+    [party_id] => 27
+    [type_of_order] => 1
+    [order_department_status] => 3
+    [forwarded_date] => 
+    [last_updated_date] => 2026-06-18
+    [order_status] => 4
+    [status] => 1
+    [created_on] => 2026-06-18 08:39:58
+    [updated_on] => 2026-06-19 07:21:20
+    [is_deleted] => 0
+    [remark] => OFFICE DISPATCH
+    [employee_name] => SHAKHAMBARI HAVALDAR
+    [assigned_to_name] => GANESH VADTILE
+    [d_name] => SUPER ADMIN
+    [party_name] => LAXMI ENTERPRISES
+    [transport_name] => SAMPDA ROADLINES
+    [total_bundle] => 380
+)
