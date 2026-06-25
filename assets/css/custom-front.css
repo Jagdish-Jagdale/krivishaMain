@@ -7531,3 +7531,30 @@ table.dataTable>tbody>tr.child ul.dtr-details {
 .content_body{
 overflow-x: auto;
 }
+
+/* Sticky Table Headers for all tables in the project */
+thead th,
+.table thead th,
+table thead th {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    background-color: #dbeafe !important; /* Light blue color matching the theme */
+    color: #1e293b !important;
+    box-sizing: border-box;
+}
+
+/* Support for DataTables with scrollX/scrollY wrappers */
+.dataTables_scrollHead {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 101 !important;
+    background-color: #dbeafe !important;
+}
+.dataTables_scrollHeadInner,
+.dataTables_scrollHeadInner table {
+    background-color: #dbeafe !important;
+}
+

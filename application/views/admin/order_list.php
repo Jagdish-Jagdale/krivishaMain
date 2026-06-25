@@ -565,15 +565,22 @@
     }
     
     function proceed_Logistics(Id, inkType, order_type, party_id) {
-        
         $('#proceedBtn').data('order-id', Id);
         $('#proceedBtn').data('status', inkType);
         $('#proceedBtn').data('order_type', order_type);
         $('#proceedBtn').data('party_id', party_id);
         $('#proceedBtn').data('action', 'logistics');
-        // $('#order-type').val(order_type);
-        // $('#party-id').val(party_id);
-       const msg = 'Are you sure you want to proceed this order to Logistics?';
+        const msg = 'Are you sure you want to proceed this order to Logistics?';
+        $('#printingModalMessage').text(msg);
+    }
+
+    function proceed_Printing(Id, inkType, order_type, party_id) {
+        $('#proceedBtn').data('order-id', Id);
+        $('#proceedBtn').data('status', inkType);
+        $('#proceedBtn').data('order_type', order_type);
+        $('#proceedBtn').data('party_id', party_id);
+        $('#proceedBtn').data('action', 'printing');
+        const msg = 'Are you sure you want to proceed this order to Printing?';
         $('#printingModalMessage').text(msg);
     }
 
@@ -588,6 +595,8 @@
            
             if (action === 'logistics') {
                 proceedToLogistics(Id, val, order_type, party_id);
+            } else if (action === 'printing') {
+                proceedToPrinting(Id, val, order_type, party_id);
             } else {
                 proceedToAccounts(Id, val, order_type, party_id);
             }
@@ -597,6 +606,25 @@
     function proceedToLogistics(Id, val, order_type, party_id) {
         $.ajax({
             url: '<?= base_url("admin/Ajax_controller/set_order_status_logistics") ?>',
+            type: 'POST',
+            data: { 'id': Id, 'status': val, 'order_type': order_type, 'party_id': party_id },
+            dataType: 'json',
+            success: function (response) {
+                if (response.status === '1') {
+                    location.reload();
+                } else {
+                    location.reload();
+                }
+            },
+            error: function () {
+                alert("AJAX error occurred.");
+            }
+        });
+    }
+
+    function proceedToPrinting(Id, val, order_type, party_id) {
+        $.ajax({
+            url: '<?= base_url("admin/Ajax_controller/set_order_status_printing") ?>',
             type: 'POST',
             data: { 'id': Id, 'status': val, 'order_type': order_type, 'party_id': party_id },
             dataType: 'json',

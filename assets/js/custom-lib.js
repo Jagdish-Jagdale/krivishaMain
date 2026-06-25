@@ -427,6 +427,10 @@ $(document).ready(function () {
 
         var $form = $(form);
 
+        if ($form.hasClass('no-global-disable')) {
+            return;
+        }
+
         // If already submitting, block.
         if ($form.data(SUBMIT_LOCK_KEY)) {
             ev.preventDefault();

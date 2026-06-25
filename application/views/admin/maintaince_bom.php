@@ -101,53 +101,9 @@
                                                     $mould_details = $this->Admin_model->get_type_of_mould($part_id);
                                                     $size = !empty($mould_details) ? $mould_details->type_of_mould : '';
                                                     break;
-                                                case 'ALANKEY BOLT':
-                                                    $mould_details = $this->Admin_model->get_alankey_bolt($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->alankey_bolt : '';
-                                                    break;
-                                                case 'AIR PIN':
-                                                    $mould_details = $this->Admin_model->get_air_pin($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->air_pin : '';
-                                                    break;
-                                                case 'SPRING':
-                                                    $mould_details = $this->Admin_model->get_air_spring($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->spring : '';
-                                                    break;
-                                                case 'PU NIPPLES':
-                                                    $mould_details = $this->Admin_model->get_air_pu_nipples($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->pu_nipples : '';
-                                                    break;
-                                                case 'EJECTOR PIN':
-                                                    $mould_details = $this->Admin_model->get_air_ejector_pin($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->ejector_pin : '';
-                                                    break;
-                                                case 'I BOLT':
-                                                    $mould_details = $this->Admin_model->get_air_i_bolt($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->i_bolt : '';
-                                                    break;
-                                                case 'CORD':
-                                                    $mould_details = $this->Admin_model->get_air_cord($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->cord : '';
-                                                    break;
-                                                case 'O RING':
-                                                    $mould_details = $this->Admin_model->get_air_o_ring($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->o_ring : '';
-                                                    break;
-                                                case 'INSERT SLOT PLATE':
-                                                    $mould_details = $this->Admin_model->get_air_insert_slot_plate($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->insert_slot_plate : '';
-                                                    break;
-                                                case 'CORE CYLINDER SEAL':
-                                                    $mould_details = $this->Admin_model->get_air_core_cylinder_seal($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->core_cylinder_seal : '';
-                                                    break;
-                                                case 'SEAL':
-                                                    $mould_details = $this->Admin_model->get_air_seal($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->seal : '';
-                                                    break;
-                                                case 'HOSE PIPE':
-                                                    $mould_details = $this->Admin_model->get_air_hose_pipe($part_id);
-                                                    $size = !empty($mould_details) ? $mould_details->hose_pipe : '';
+                                                default:
+                                                    $mould_details = $this->db->get_where('tbl_rm_master', array('id' => $part_id, 'is_deleted' => '0'))->row();
+                                                    $size = !empty($mould_details) ? $mould_details->rm_name : '';
                                                     break;
                                             }
                                             $size_trim = trim((string) $size);

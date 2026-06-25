@@ -50,20 +50,13 @@
         position: relative;
     }
    .custom-modal {
-        padding: 0 !important;   /* set your width */
-        margin: 0 auto;       /* fixed width */ 
-        margin-left: 500px;
-        top: 50px;      /* fixed height */
-        max-width: 1120px;
-        width: 1120px;
-        height: 600px;      /* fixed height */
-        overflow-y: auto; /* Enable vertical scrollbar if content exceeds modal height */
-
+        overflow-y: auto;
     }
 
     .modal-dialog {
         max-width: 1120px;
-        width: 1120px;
+        width: 90%;
+        margin: 1.75rem auto;
     }
 </style>
 <!-- page content -->

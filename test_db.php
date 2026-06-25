@@ -4,6 +4,13 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
+// Check if bundle_bag_qty exists
+$res1 = $conn->query("SHOW COLUMNS FROM tbl_order_sub_details LIKE 'bundle_bag_qty'");
+echo "tbl_order_sub_details bundle_bag_qty exists: " . ($res1->num_rows > 0 ? "YES" : "NO") . "\n";
+
+$res2 = $conn->query("SHOW COLUMNS FROM tbl_order_container_details LIKE 'bundle_bag_qty'");
+echo "tbl_order_container_details bundle_bag_qty exists: " . ($res2->num_rows > 0 ? "YES" : "NO") . "\n";
+
 $sql = "SELECT id, task_id, date, last_updated_date, created_on, department_id, order_department_status FROM tbl_auto_task_list WHERE task_id = 'ORD-2473'";
 $result = $conn->query($sql);
 

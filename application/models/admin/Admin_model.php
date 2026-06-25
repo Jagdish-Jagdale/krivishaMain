@@ -108,7 +108,7 @@ class Admin_model extends CI_model
 	private function _restrict_customer_queries($party_id_field = null)
 	{
 		if ((string) $this->session->userdata('is_admin') !== '1') {
-			if ($this->_user_has_department(12) || $this->_user_has_department(25)) {
+			if ($this->_user_has_department(11) || $this->_user_has_department(12) || $this->_user_has_department(17) || $this->_user_has_department(25)) {
 				return;
 			}
 			$user_id = $this->session->userdata('id');
@@ -8783,21 +8783,43 @@ class Admin_model extends CI_model
 				FROM tbl_outward_orders
 				LEFT JOIN tbl_transport_master ON tbl_outward_orders.transport_id = tbl_transport_master.id
 				WHERE tbl_outward_orders.order_id = tbl_auto_task_list.task_id
-					AND tbl_outward_orders.is_deleted = 0
+					AND tbl_outward_orders.is_deleted = \'0\'
 				ORDER BY tbl_outward_orders.updated_on DESC, tbl_outward_orders.id DESC
 				LIMIT 1
 			) AS transport_name,
 			(
-				(SELECT COALESCE(SUM(order_quantity), 0)
+				(SELECT COALESCE(SUM(CAST(order_quantity AS DECIMAL(10,2)) / COALESCE(NULLIF(CAST(tbl_production_bom.batch AS DECIMAL(10,2)), 0), 120)), 0)
 				FROM tbl_order_sub_details
+				LEFT JOIN tbl_production_bom ON tbl_order_sub_details.article_id = tbl_production_bom.article_id AND tbl_production_bom.is_deleted = \'0\'
 				WHERE tbl_order_sub_details.order_id = tbl_auto_task_list.task_id
-					AND tbl_order_sub_details.is_deleted = 0)
+					AND tbl_order_sub_details.is_deleted = \'0\')
 				+
-				(SELECT COALESCE(SUM(order_quantity), 0)
+				(SELECT COALESCE(SUM(CAST(order_quantity AS DECIMAL(10,2)) / COALESCE(NULLIF(CAST(tbl_production_bom.batch AS DECIMAL(10,2)), 0), 120)), 0)
 				FROM tbl_order_container_details
+				LEFT JOIN tbl_production_bom ON tbl_order_container_details.article_id = tbl_production_bom.article_id AND tbl_production_bom.is_deleted = \'0\'
 				WHERE tbl_order_container_details.order_id = tbl_auto_task_list.task_id
-					AND tbl_order_container_details.is_deleted = 0)
-			) AS total_bundle
+					AND tbl_order_container_details.is_deleted = \'0\')
+			) AS total_bundle,
+			(
+				SELECT tbl_outward_orders.created_on
+				FROM tbl_outward_orders
+				WHERE tbl_outward_orders.order_id = tbl_auto_task_list.task_id
+					AND tbl_outward_orders.is_deleted = \'0\'
+				ORDER BY tbl_outward_orders.updated_on DESC, tbl_outward_orders.id DESC
+				LIMIT 1
+			) AS dispatch_date,
+			COALESCE(
+				(
+					SELECT tbl_auto_task_list_history.last_updated_date
+					FROM tbl_auto_task_list_history
+					WHERE tbl_auto_task_list_history.task_id = tbl_auto_task_list.id
+						AND tbl_auto_task_list_history.details_of_task = \'Assigned to Logistics Department\'
+						AND tbl_auto_task_list_history.is_deleted = \'0\'
+					ORDER BY tbl_auto_task_list_history.id DESC
+					LIMIT 1
+				),
+				tbl_auto_task_list.date
+			) AS forwarded_to_logistics_date
 		');
 		$this->db->from('tbl_auto_task_list');
 		$this->db->join('tbl_customers', 'tbl_auto_task_list.party_id = tbl_customers.id', 'left');
@@ -8814,6 +8836,26 @@ class Admin_model extends CI_model
 
 		// Exclude orders that are Closed (5) or Cancelled (6) in the main order table
 		$this->db->where("tbl_auto_task_list.task_id NOT IN (SELECT order_id FROM tbl_order_details WHERE order_status IN ('5','6') AND is_deleted = '0')", null, false);
+
+		if ($this->input->post('final_status') != "1") {
+			// Exclude fully dispatched orders (where all sub details or all container details are status '4')
+			$this->db->where("
+				NOT (
+					(SELECT COUNT(id) FROM tbl_order_sub_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) > 0
+					AND
+					(SELECT COUNT(id) FROM tbl_order_sub_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) =
+					(SELECT COUNT(id) FROM tbl_order_sub_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status = '4')
+				)
+			", null, false);
+			$this->db->where("
+				NOT (
+					(SELECT COUNT(id) FROM tbl_order_container_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) > 0
+					AND
+					(SELECT COUNT(id) FROM tbl_order_container_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) =
+					(SELECT COUNT(id) FROM tbl_order_container_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status = '4')
+				)
+			", null, false);
+		}
 		$this->db->order_by('tbl_auto_task_list.id', 'DESC');
 
 		if ($this->input->post('search_date') != "") {
@@ -8885,6 +8927,26 @@ class Admin_model extends CI_model
 
 		// Exclude orders that are Closed (5) or Cancelled (6) in the main order table
 		$this->db->where("tbl_auto_task_list.task_id NOT IN (SELECT order_id FROM tbl_order_details WHERE order_status IN ('5','6') AND is_deleted = '0')", null, false);
+
+		if ($this->input->post('final_status') != "1") {
+			// Exclude fully dispatched orders (where all sub details or all container details are status '4')
+			$this->db->where("
+				NOT (
+					(SELECT COUNT(id) FROM tbl_order_sub_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) > 0
+					AND
+					(SELECT COUNT(id) FROM tbl_order_sub_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) =
+					(SELECT COUNT(id) FROM tbl_order_sub_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status = '4')
+				)
+			", null, false);
+			$this->db->where("
+				NOT (
+					(SELECT COUNT(id) FROM tbl_order_container_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) > 0
+					AND
+					(SELECT COUNT(id) FROM tbl_order_container_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status IN ('0','1','3','4','9')) =
+					(SELECT COUNT(id) FROM tbl_order_container_details WHERE order_id = tbl_auto_task_list.task_id AND is_deleted = '0' AND order_status = '4')
+				)
+			", null, false);
+		}
 
 
 		if ($this->input->post('search_date') != "") {
@@ -9721,6 +9783,210 @@ class Admin_model extends CI_model
 			echo 1;
 		} else {
 			echo 0;
+		}
+	}
+
+	public function set_order_status_logistics()
+	{
+		$this->db->where('is_deleted', '0');
+		$this->db->where('id', $this->input->post('id'));
+		$result = $this->db->get('tbl_order_details')->row();
+
+		if ($result) {
+			$this->db->select('id');
+			$this->db->from('tbl_krivisha_department');
+			$this->db->where('department', 'LOGISTICS');
+			$query = $this->db->get()->row();
+
+			$department_id = $query ? $query->id : 11;
+			
+			// Update main order status to '9' (Dispatch Inprocess)
+			$this->db->where('order_id', $result->order_id);
+			$this->db->update('tbl_order_details', array('order_status' => '9', 'updated_on' => date('Y-m-d H:i:s')));
+
+			// Update sub details status
+			$this->db->where('order_id', $result->order_id);
+			$this->db->update('tbl_order_sub_details', array('order_status' => '9', 'order_department_status' => '3'));
+
+			$this->db->where('order_id', $result->order_id);
+			$this->db->update('tbl_order_container_details', array('order_status' => '9'));
+
+			// Check if task already exists in tbl_auto_task_list
+			$this->db->where('task_id', $result->order_id);
+			$this->db->where('is_deleted', '0');
+			$existing_task = $this->db->get('tbl_auto_task_list')->row();
+
+			if ($existing_task) {
+				$task_data = array(
+					'department_id' => $department_id,
+					'order_department_status' => '3',
+					'order_status' => '9',
+					'last_updated_date' => date('Y-m-d'),
+					'updated_on' => date('Y-m-d H:i:s')
+				);
+				$this->db->where('id', $existing_task->id);
+				$this->db->update('tbl_auto_task_list', $task_data);
+				$task_id = $existing_task->id;
+			} else {
+				$process_data = array(
+					'task_id' => $result->order_id,
+					'order_department' => '1',
+					'employee_id' => $this->session->userdata('id'),
+					'department_id' => $department_id,
+					'party_id' => $result->party_id,
+					'type_of_order' => $result->type_of_order,
+					'date' => date('Y-m-d'),
+					'order_department_status' => '3',
+					'order_status' => '9',
+					'plant_id' => $this->session->userdata("assign_plant_id"),
+					'created_on' => date('Y-m-d H:i:s'),
+					'updated_on' => date('Y-m-d H:i:s')
+				);
+				$this->db->insert('tbl_auto_task_list', $process_data);
+				$task_id = $this->db->insert_id();
+			}
+
+			// Insert history
+			$history_data = array(
+				'task_id' => $task_id,
+				'task_status' => '1',
+				'task_action' => '1',
+				'department_id' => $department_id,
+				'details_of_task' => 'Assigned to Logistics Department',
+				'party_id' => $result->party_id,
+				'type_of_order' => $result->type_of_order,
+				'last_updated_date' => date('Y-m-d'),
+				'last_updated_by' => $this->session->userdata('id'),
+				'plant_id' => $this->session->userdata("assign_plant_id"),
+				'created_on' => date('Y-m-d H:i:s'),
+			);
+			$this->db->insert('tbl_auto_task_list_history', $history_data);
+
+			// Notification
+			$title = 'Order Update';
+			$description = 'Order ' . $result->order_id . ' Assigned to Logistics Department by ' . $this->session->userdata('name');
+			$landing_page = 'outward_order_list';
+			$notification_according = '1'; // according department
+			$departments = [11, 25]; // 11 = Logistics / Accounts, 25 = Admin
+			$departments_str = implode(',', $departments);
+			
+			$notification_data = array(
+				'notification_title' => $title,
+				'notification_description' => $description,
+				'notification_department' => $departments_str,
+				'order_id' => $result->order_id,
+				'plant_id' => $this->session->userdata("assign_plant_id"),
+				'created_on' => date('Y-m-d H:i:s')
+			);
+			$this->db->insert('tbl_notifications', $notification_data);
+
+			$this->send_task_notification_by_token(50, $title, $description, $landing_page, $notification_according, $this->session->userdata("assign_plant_id"));
+
+			echo json_encode(array('status' => '1', 'message' => 'Processed successfully'));
+		} else {
+			echo json_encode(array('status' => '2', 'message' => 'Order not found'));
+		}
+	}
+
+	public function set_order_status_printing()
+	{
+		$this->db->where('is_deleted', '0');
+		$this->db->where('id', $this->input->post('id'));
+		$result = $this->db->get('tbl_order_details')->row();
+
+		if ($result) {
+			$this->db->select('id');
+			$this->db->from('tbl_krivisha_department');
+			$this->db->where('department', 'PRINTING');
+			$query = $this->db->get()->row();
+
+			$department_id = $query ? $query->id : 10;
+			
+			// Update main order status to '7' (Printing Inprocess)
+			$this->db->where('order_id', $result->order_id);
+			$this->db->update('tbl_order_details', array('order_status' => '7', 'updated_on' => date('Y-m-d H:i:s')));
+
+			// Update sub details status
+			$this->db->where('order_id', $result->order_id);
+			$this->db->update('tbl_order_sub_details', array('order_status' => '7', 'order_department_status' => '2'));
+
+			$this->db->where('order_id', $result->order_id);
+			$this->db->update('tbl_order_container_details', array('order_status' => '7'));
+
+			// Check if task already exists in tbl_auto_task_list
+			$this->db->where('task_id', $result->order_id);
+			$this->db->where('is_deleted', '0');
+			$existing_task = $this->db->get('tbl_auto_task_list')->row();
+
+			if ($existing_task) {
+				$task_data = array(
+					'department_id' => $department_id,
+					'order_department_status' => '2',
+					'order_status' => '7',
+					'last_updated_date' => date('Y-m-d'),
+					'updated_on' => date('Y-m-d H:i:s')
+				);
+				$this->db->where('id', $existing_task->id);
+				$this->db->update('tbl_auto_task_list', $task_data);
+				$task_id = $existing_task->id;
+			} else {
+				$process_data = array(
+					'task_id' => $result->order_id,
+					'order_department' => '1',
+					'employee_id' => $this->session->userdata('id'),
+					'department_id' => $department_id,
+					'party_id' => $result->party_id,
+					'type_of_order' => $result->type_of_order,
+					'date' => date('Y-m-d'),
+					'order_department_status' => '2',
+					'order_status' => '7',
+					'plant_id' => $this->session->userdata("assign_plant_id"),
+					'created_on' => date('Y-m-d H:i:s'),
+					'updated_on' => date('Y-m-d H:i:s')
+				);
+				$this->db->insert('tbl_auto_task_list', $process_data);
+				$task_id = $this->db->insert_id();
+			}
+
+			// Insert history
+			$history_data = array(
+				'task_id' => $task_id,
+				'task_status' => '1',
+				'task_action' => '1',
+				'department_id' => $department_id,
+				'details_of_task' => 'Assigned to Printing Department',
+				'party_id' => $result->party_id,
+				'type_of_order' => $result->type_of_order,
+				'last_updated_date' => date('Y-m-d'),
+				'last_updated_by' => $this->session->userdata('id'),
+				'plant_id' => $this->session->userdata("assign_plant_id"),
+				'created_on' => date('Y-m-d H:i:s'),
+			);
+			$this->db->insert('tbl_auto_task_list_history', $history_data);
+
+			// Notification
+			$title = 'Order Update';
+			$description = 'Order ' . $result->order_id . ' Assigned to Printing Department by ' . $this->session->userdata('name');
+			$landing_page = 'printing_order_list';
+			$notification_according = '1'; // according department
+			$departments = [$department_id, 25]; // Printing Department, Admin
+			$departments_str = implode(',', $departments);
+			
+			$notification_data = array(
+				'notification_title' => $title,
+				'notification_description' => $description,
+				'notification_department' => $departments_str,
+				'order_id' => $result->order_id,
+				'plant_id' => $this->session->userdata("assign_plant_id"),
+				'created_on' => date('Y-m-d H:i:s')
+			);
+			$this->db->insert('tbl_notifications', $notification_data);
+
+			$this->send_task_notification_by_token(50, $title, $description, $landing_page, $notification_according, $this->session->userdata("assign_plant_id"));
+
+			echo json_encode(array('status' => '1', 'message' => 'Processed successfully'));
+		} else {
+			echo json_encode(array('status' => '2', 'message' => 'Order not found'));
 		}
 	}
 
@@ -14575,8 +14841,29 @@ class Admin_model extends CI_model
 	{
 		// echo"<pre>";print_r($_POST);exit;
 		$vehical_id = $this->input->post('vehical');
-		$in_km = $this->input->post('in_km');
-		$out_km = $this->input->post('out_km');
+		$in_km = (float)$this->input->post('in_km');
+
+		// Fetch the last in_km for this vehicle on the server side
+		$last_in_km = 0.0;
+		if (!empty($vehical_id)) {
+			$this->db->select('in_km');
+			$this->db->where('vehical_id', $vehical_id);
+			$this->db->where('is_deleted', '0');
+			if ($this->input->post('id') != "") {
+				$this->db->where('id !=', $this->input->post('id'));
+			}
+			$this->db->order_by('id', 'DESC');
+			$this->db->limit(1);
+			$prev = $this->db->get('tbl_own_vehicle_details')->row();
+			if ($prev) {
+				$last_in_km = (float)$prev->in_km;
+			}
+		}
+
+		if ($in_km <= $last_in_km) {
+			return '0';
+		}
+
 		$data = array(
 			'vehical_id' => $vehical_id,
 			// 'vehical_type' => $type,
@@ -14587,8 +14874,8 @@ class Admin_model extends CI_model
 			'pincode' => $this->input->post('pincode'),
 			'purpose' => str_replace(' ', '', implode(', ', $this->input->post('purpose'))),
 			'party_id' => $this->input->post('party_id'),
-			'in_km' => !empty($in_km) ? $in_km : 0,
-			'out_km' => !empty($out_km) ? $out_km : 0,
+			'in_km' => $in_km,
+			'out_km' => $last_in_km,
 			'market_freight' => $this->input->post('market_freight'),
 			'diesel_topup' => $this->input->post('diesel_topup'),
 			'driver_expense' => $this->input->post('driver_expense'),
@@ -14664,6 +14951,16 @@ class Admin_model extends CI_model
 		$this->db->limit(1);
 		$result = $this->db->get('tbl_own_vehicle_details');
 		return $result->row();
+	}
+	public function get_last_in_km_by_vehicle($vehical_id)
+	{
+		$this->db->select('in_km');
+		$this->db->where('vehical_id', $vehical_id);
+		$this->db->where('is_deleted', '0');
+		$this->db->order_by('id', 'DESC');
+		$this->db->limit(1);
+		$result = $this->db->get('tbl_own_vehicle_details')->row();
+		return $result ? (float)$result->in_km : 0.0;
 	}
 	public function get_all_vehical_list_details($length, $start, $search)
 	{
@@ -19624,6 +19921,8 @@ class Admin_model extends CI_model
 				b.machine_id,
 				mm.machine_name,
 				b.operator_name,
+				b.day_shift_operators,
+				b.night_shift_operators,
 				p.planned_qty,
 				COALESCE(NULLIF(p.scheduled_minutes, 0), a.active_minutes, 0) AS scheduled_minutes,
 				p.shift_start,
@@ -19641,7 +19940,9 @@ class Admin_model extends CI_model
 				SELECT
 					DATE(pr.production_date) AS production_date,
 					pr.machine_id,
-					GROUP_CONCAT(DISTINCT NULLIF(TRIM(pr.remark), '') SEPARATOR ', ') AS operator_name
+					GROUP_CONCAT(DISTINCT NULLIF(TRIM(pr.operator_name), '') SEPARATOR ', ') AS operator_name,
+					GROUP_CONCAT(DISTINCT NULLIF(TRIM(pr.day_shift_operators), '') SEPARATOR ', ') AS day_shift_operators,
+					GROUP_CONCAT(DISTINCT NULLIF(TRIM(pr.night_shift_operators), '') SEPARATOR ', ') AS night_shift_operators
 				FROM tbl_production_report pr
 				WHERE {$where_pr}
 				GROUP BY DATE(pr.production_date), pr.machine_id
@@ -19802,7 +20103,53 @@ class Admin_model extends CI_model
 			";
 
 		$params = array_merge($params_pr, $params_sch, $params_act, $params_rej, $params_down);
-		return $this->db->query($sql, $params)->result();
+		$results = $this->db->query($sql, $params)->result();
+
+		// Collect all operator IDs
+		$op_ids = [];
+		foreach ($results as $row) {
+			if (!empty($row->day_shift_operators)) {
+				$op_ids = array_merge($op_ids, explode(',', $row->day_shift_operators));
+			}
+			if (!empty($row->night_shift_operators)) {
+				$op_ids = array_merge($op_ids, explode(',', $row->night_shift_operators));
+			}
+		}
+		$op_ids = array_values(array_unique(array_filter($op_ids)));
+
+		$op_map = [];
+		if (!empty($op_ids)) {
+			$this->db->select('id, first_name');
+			$this->db->where_in('id', $op_ids);
+			$users = $this->db->get('user_data')->result();
+			foreach ($users as $u) {
+				$op_map[$u->id] = $u->first_name;
+			}
+		}
+
+		foreach ($results as $row) {
+			$day_names = [];
+			if (!empty($row->day_shift_operators)) {
+				foreach (explode(',', $row->day_shift_operators) as $oid) {
+					if (isset($op_map[$oid])) {
+						$day_names[] = $op_map[$oid];
+					}
+				}
+			}
+			$row->day_shift_operator_names = implode(', ', $day_names);
+
+			$night_names = [];
+			if (!empty($row->night_shift_operators)) {
+				foreach (explode(',', $row->night_shift_operators) as $oid) {
+					if (isset($op_map[$oid])) {
+						$night_names[] = $op_map[$oid];
+					}
+				}
+			}
+			$row->night_shift_operator_names = implode(', ', $night_names);
+		}
+
+		return $results;
 	}
 
 	public function get_production_report_downtime_analysis($from_date = null, $to_date = null, $machine_id = '', $article_id = '')

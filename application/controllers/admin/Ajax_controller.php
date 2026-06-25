@@ -1314,10 +1314,17 @@ class Ajax_controller extends CI_Controller
                             <i class="fa-solid fa-pen-to-square"></i>
                         </a>';
                     if ($order_ststus == 'Processed to Account') {
-                        $action_buttons .= '
-                            <a class="btn btn-primary" data-bs-toggle="modal" onclick="proceed_Logistics(' . $member->id . ', ' . $member->ink_type . ', ' . $member->party_id . ', ' . $member->type_of_order . ')" data-bs-target="#nextPrintingModal" title="Proceed to Logistics">
-                                <i class="fa-solid fa-arrow-right"></i>
-                            </a>';
+                        if ($member->ink_type == '2') {
+                            $action_buttons .= '
+                                <a class="btn btn-primary" data-bs-toggle="modal" onclick="proceed_Printing(' . $member->id . ', ' . $member->ink_type . ', ' . $member->party_id . ', ' . $member->type_of_order . ')" data-bs-target="#nextPrintingModal" title="Proceed to Printing">
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                </a>';
+                        } else {
+                            $action_buttons .= '
+                                <a class="btn btn-primary" data-bs-toggle="modal" onclick="proceed_Logistics(' . $member->id . ', ' . $member->ink_type . ', ' . $member->party_id . ', ' . $member->type_of_order . ')" data-bs-target="#nextPrintingModal" title="Proceed to Logistics">
+                                    <i class="fa-solid fa-arrow-right"></i>
+                                </a>';
+                        }
                     } else {
                         $action_buttons .= '
                             <a class="btn btn-primary" data-bs-toggle="modal" onclick="proceed_Account(' . $member->id . ', ' . $member->ink_type . ', ' . $member->party_id . ', ' . $member->type_of_order . ')" data-bs-target="#nextPrintingModal" title="Proceed to Account">
@@ -1452,6 +1459,10 @@ class Ajax_controller extends CI_Controller
     public function set_order_status_logistics()
     {
         $this->Admin_model->set_order_status_logistics();
+    }
+    public function set_order_status_printing()
+    {
+        $this->Admin_model->set_order_status_printing();
     }
     public function get_all_task_history()
     {
@@ -3961,6 +3972,13 @@ class Ajax_controller extends CI_Controller
         $result = $this->Admin_model->get_all_vehical();
         echo json_encode($result);
     }
+    public function get_last_in_km_by_vehicle()
+    {
+        $vehical_id = $this->input->post('vehical_id');
+        $last_in_km = $this->Admin_model->get_last_in_km_by_vehicle($vehical_id);
+        echo json_encode(array('last_in_km' => $last_in_km));
+        exit();
+    }
     public function get_all_vehical_list_details()
     {
         $draw = intval($this->input->post("draw"));
@@ -4266,22 +4284,41 @@ class Ajax_controller extends CI_Controller
                     }
                 }
 
-                $order_date_obj = $parseDateValue($member->date ?? '');
-                $forwarded_date_val = (!empty($member->last_updated_date) && $member->last_updated_date != '0000-00-00') ? $member->last_updated_date : ($member->created_on ?? '');
-                $forwarded_date_obj = $parseDateValue($forwarded_date_val);
+                if ($this->input->post('final_status') != "1" && ($order_ststus === 'Fully Dispatched' || $order_ststus === 'Full Dispatched')) {
+                    continue;
+                }
 
-                $delay_days = '-';
-                if ($order_date_obj instanceof DateTime && $forwarded_date_obj instanceof DateTime) {
-                    $delay_days = (string)$order_date_obj->diff($forwarded_date_obj)->days;
-                } elseif ($order_date_obj instanceof DateTime) {
-                    $delay_end_obj = new DateTime();
-                    if ($this->input->post('final_status') == "1") {
-                        $dispatch_date_obj = $parseDateValue($member->updated_on ?? '');
-                        if ($dispatch_date_obj instanceof DateTime) {
-                            $delay_end_obj = $dispatch_date_obj;
-                        }
+                $order_date_obj = $parseDateValue($member->date ?? '');
+                $is_dispatched_view = ($this->input->post('final_status') == "1");
+
+                if ($is_dispatched_view) {
+                    $forwarded_date_val = $member->forwarded_to_logistics_date ?? $member->date;
+                    $forwarded_date_obj = $parseDateValue($forwarded_date_val);
+
+                    $dispatch_date_val = $member->dispatch_date ?? $member->updated_on;
+                    $dispatch_date_obj = $parseDateValue($dispatch_date_val);
+
+                    $delay_days = '0';
+                    if ($forwarded_date_obj instanceof DateTime && $dispatch_date_obj instanceof DateTime) {
+                        $forwarded_date_obj->setTime(0, 0, 0);
+                        $dispatch_date_obj->setTime(0, 0, 0);
+                        $delay_days = (string)$forwarded_date_obj->diff($dispatch_date_obj)->days;
                     }
-                    $delay_days = (string)$order_date_obj->diff($delay_end_obj)->days;
+                } else {
+                    $forwarded_date_val = (!empty($member->last_updated_date) && $member->last_updated_date != '0000-00-00') ? $member->last_updated_date : ($member->created_on ?? '');
+                    $forwarded_date_obj = $parseDateValue($forwarded_date_val);
+
+                    $delay_days = '-';
+                    if ($order_date_obj instanceof DateTime && $forwarded_date_obj instanceof DateTime) {
+                        $order_date_obj->setTime(0, 0, 0);
+                        $forwarded_date_obj->setTime(0, 0, 0);
+                        $delay_days = (string)$order_date_obj->diff($forwarded_date_obj)->days;
+                    } elseif ($order_date_obj instanceof DateTime) {
+                        $delay_end_obj = new DateTime();
+                        $order_date_obj->setTime(0, 0, 0);
+                        $delay_end_obj->setTime(0, 0, 0);
+                        $delay_days = (string)$order_date_obj->diff($delay_end_obj)->days;
+                    }
                 }
 
                 $order_date_display = ($order_date_obj instanceof DateTime) ? $order_date_obj->format('d-m-Y') : '-';
@@ -4299,7 +4336,7 @@ class Ajax_controller extends CI_Controller
                 $sub_array[] = $forwarded_date_display;
                 $sub_array[] = $delay_days;
                 $sub_array[] = !empty($member->transport_name) ? $member->transport_name : '-';
-                $sub_array[] = !empty($member->total_bundle) ? $member->total_bundle : '0';
+                $sub_array[] = !empty($member->total_bundle) ? (string)(float)round($member->total_bundle, 2) : '0';
                 $sub_array[] = $member->type_of_order;
                 $sub_array[] = $order_ststus;
                 

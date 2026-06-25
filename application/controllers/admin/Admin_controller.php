@@ -703,7 +703,7 @@ class Admin_controller extends CI_Controller
 			}
 			$result = $this->Admin_model->set_maintaince_bom($bom_data);
 			if ($result != '') {
-				redirect('add_production_bom/' . $result . '/' . $result);
+				redirect('add_production_bom/' . $result);
 			} else {
 				$this->session->set_flashdata('message', 'Failed to Add!');
 				redirect($_SERVER['HTTP_REFERER']);

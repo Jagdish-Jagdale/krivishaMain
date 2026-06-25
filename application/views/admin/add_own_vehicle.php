@@ -147,11 +147,11 @@
                             </div>
 
                             <input type="hidden" name="out_km" class="form-control" id="out_km"
-                                value="<?php echo !empty($out_km) ? $out_km->out_km : '' ?>">
+                                value="<?php echo !empty($single) ? $single->out_km : '' ?>">
 
                             <div class="form-group col-xl-3 col-lg-4 col-md-4 col-sm-6 col-xs-12">
                                 <label for="in_km">In KM<b class="require">*</b></label>
-                                <input type="number" min="1" name="in_km" class="form-control" id="in_km"
+                                <input type="number" step="any" min="0" name="in_km" class="form-control" id="in_km"
                                     value="<?php echo !empty($single) ? $single->in_km : '' ?>"
                                     placeholder="Please enter in km">
                                 <span id="in_km_error" class=""></span>
@@ -283,6 +283,29 @@ if ($this->uri->segment(2) != "") {
         $('#purpose').select2({
             placeholder: "Please select purpose",
             width: '100%'
+        });
+
+        // Fetch last In KM dynamically on vehicle change
+        $('#vehical').on('change', function () {
+            var vehicalId = $(this).val();
+            if (vehicalId !== '' && '<?= $id ?>' === '') {
+                $.ajax({
+                    url: '<?= base_url() ?>admin/Ajax_controller/get_last_in_km_by_vehicle',
+                    method: 'POST',
+                    data: {
+                        vehical_id: vehicalId
+                    },
+                    dataType: 'json',
+                    success: function (response) {
+                        var last_in_km = parseFloat(response.last_in_km) || 0;
+                        $('#out_km').val(last_in_km);
+                        $('#in_km').trigger('keyup');
+                    },
+                });
+            } else if ('<?= $id ?>' === '') {
+                $('#out_km').val('');
+                $('#in_km').trigger('keyup');
+            }
         });
     });
     document.addEventListener("DOMContentLoaded", function () {

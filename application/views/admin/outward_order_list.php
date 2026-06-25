@@ -58,7 +58,7 @@
         </div>
         <div class="page_body">
             <div class="page_sec">
-                <form method="get" name="maintenance_list" id="maintenance_list" enctype="multipart/form-data">
+                <form method="get" name="maintenance_list" id="maintenance_list" class="no-global-disable" enctype="multipart/form-data">
                     <div class="row flex_wrap">
                         <div class="form-group col-xl-3 col-lg-4 col-md-6 col-sm-12 col-xs-12">
                             <label>Date</label>
@@ -108,9 +108,6 @@
                                     </option>
                                     <option value="3" <?php if (isset($_GET['order_status']) && $_GET['order_status'] == '3') { ?>selected="selected" <?php } ?>>Partially Dispatched
                                     </option>
-                                    <option value="4" <?php if (isset($_GET['order_status']) && $_GET['order_status'] == '4') { ?>selected="selected" <?php } ?>>Full Dispatched
-                                    </option>
-
                                 </select>
                             </div>
                         </div>
@@ -295,8 +292,12 @@
 
             },
 
-            "drawCallback": function(settings) {
+             "drawCallback": function(settings) {
                 $('[data-toggle="tooltip"]').tooltip();
+                
+                // Restore search button state
+                var $btn = $('#submit');
+                $btn.html('Search').prop('disabled', false);
             }
         });
 
@@ -306,6 +307,11 @@
             $('#party_action').val($('#party').val());
             $('#order_status_action').val($('#order_status').val());
             $('#division_action').val($('#division').val());
+            
+            // Set button to processing state
+            var $btn = $('#submit');
+            $btn.html('<i class="fa fa-spinner fa-spin"></i> Processing...').prop('disabled', true);
+            
             table.ajax.reload();
         });
 

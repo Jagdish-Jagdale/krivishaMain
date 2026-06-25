@@ -64,11 +64,11 @@
                                     <option value="">Please Select Department</option>
                                     <?php
                                     $order_id = $this->uri->segment(2);
-                                    $check_order_department = $this->db->select('order_department_status')
+                                    $check_order_department = $this->db->select('tbl_auto_task_list.order_department_status, tbl_order_details.ink_type')
                                         ->from('tbl_auto_task_list')
-                                        ->where('id', $order_id)
-                                        ->where('type_of_order', '2')
-                                        ->where('is_deleted', '0')
+                                        ->join('tbl_order_details', 'tbl_auto_task_list.task_id = tbl_order_details.order_id', 'left')
+                                        ->where('tbl_auto_task_list.id', $order_id)
+                                        ->where('tbl_auto_task_list.is_deleted', '0')
                                         ->get()
                                         ->row();
 
@@ -76,8 +76,8 @@
                                         foreach ($krivisha_department as $make_result) {
                                             $status = $check_order_department->order_department_status ?? null;
 
-                                            // Skip department id 21 if status is not 2 or 3
-                                            if (($status == '1') && $make_result->id == 11) {
+                                            // Skip department id 11 (LOGISTICS) if status is 1 (Accounts) AND ink_type is 2 (Printing)
+                                            if (($status == '1') && $make_result->id == 11 && ($check_order_department->ink_type == '2')) {
                                                 continue;
                                             }
 

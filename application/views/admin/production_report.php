@@ -650,17 +650,30 @@
                     <tr>
                         <th style="background:#e8f0fd; color:#0056d0; font-weight:700;">Operators Name</th>
                         <td colspan="7"><?php
-                            $operator_names = [];
+                            $day_ops = [];
+                            $night_ops = [];
                             if (!empty($current_overview_rows)) {
                                 foreach ($current_overview_rows as $row) {
-                                    if (!empty($row->operator_name)) {
-                                        $names = array_filter(array_map('trim', preg_split('/[,;|+&\/]+/', $row->operator_name)));
-                                        $operator_names = array_merge($operator_names, $names);
+                                    if (!empty($row->day_shift_operator_names)) {
+                                        $day_ops = array_merge($day_ops, array_filter(array_map('trim', explode(',', $row->day_shift_operator_names))));
+                                    }
+                                    if (!empty($row->night_shift_operator_names)) {
+                                        $night_ops = array_merge($night_ops, array_filter(array_map('trim', explode(',', $row->night_shift_operator_names))));
                                     }
                                 }
                             }
-                            $unique_operators = array_unique($operator_names);
-                            echo !empty($unique_operators) ? htmlspecialchars(implode(', ', $unique_operators)) : '-';
+                            $unique_day = array_unique($day_ops);
+                            $unique_night = array_unique($night_ops);
+                            
+                            $display_parts = [];
+                            if (!empty($unique_day)) {
+                                $display_parts[] = 'Day Shift: ' . implode(', ', $unique_day);
+                            }
+                            if (!empty($unique_night)) {
+                                $display_parts[] = 'Night Shift: ' . implode(', ', $unique_night);
+                            }
+                            
+                            echo !empty($display_parts) ? htmlspecialchars(implode(' | ', $display_parts)) : '-';
                         ?></td>
                     </tr>
                     </tbody>
@@ -997,36 +1010,17 @@
                                     <td><?= $shift ?></td>
                                 <td>
                                     <?php
-                                    $operator_raw = trim((string) ($row->operator_name ?? ''));
-                                    $operator_list = [];
-                                    if ($operator_raw !== '') {
-                                        $operator_list = array_values(array_filter(array_map('trim', preg_split('/[,;|+&\/]+/', $operator_raw))));
+                                    $display_parts = [];
+                                    if (!empty($row->day_shift_operator_names)) {
+                                        $display_parts[] = '<strong>Day:</strong> ' . htmlspecialchars($row->day_shift_operator_names);
                                     }
-                                    $operator_unique = !empty($operator_list) ? array_values(array_unique($operator_list)) : [];
-                                    $operator_same_diff = empty($operator_unique)
-                                        ? '-'
-                                        : ((count($operator_unique) > 1) ? 'Different' : 'Same');
-
-                                    if (!empty($shift_entries)) {
-                                        $op_lines = [];
-                                        if (count($operator_list) === count($shift_entries)) {
-                                            $op_lines = $operator_list;
-                                        } elseif (count($operator_list) === 1) {
-                                            $op_lines = array_fill(0, count($shift_entries), $operator_list[0]);
-                                        } elseif (count($operator_list) > 1) {
-                                            $joined = implode(', ', $operator_list);
-                                            $op_lines = array_fill(0, count($shift_entries), $joined);
-                                        } else {
-                                            $op_lines = array_fill(0, count($shift_entries), '-');
-                                        }
-
-                                        echo '<div class="shift-breakdown">';
-                                        foreach ($op_lines as $ol) {
-                                            echo '<div class="line">' . htmlspecialchars((string) $ol) . '</div>';
-                                        }
-                                        echo '</div>';
+                                    if (!empty($row->night_shift_operator_names)) {
+                                        $display_parts[] = '<strong>Night:</strong> ' . htmlspecialchars($row->night_shift_operator_names);
+                                    }
+                                    if (!empty($display_parts)) {
+                                        echo implode('<br>', $display_parts);
                                     } else {
-                                        echo $operator_raw !== '' ? htmlspecialchars($operator_raw) : '-';
+                                        echo htmlspecialchars($row->operator_name ?: '-');
                                     }
                                     ?>
                                 </td>

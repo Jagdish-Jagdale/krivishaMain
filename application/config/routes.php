@@ -173,6 +173,7 @@ $route['migrate_stock_transactions'] = "admin/Admin_controller/migrate_stock_tra
 
 $route['task_update_list'] = "admin/Admin_controller/task_update_list";
 $route['add_production_bom'] = "admin/Admin_controller/add_production_bom";
+$route['add_production_bom/(:any)'] = "admin/Admin_controller/add_production_bom/$1";
 $route['add_production_bom/(:any)/(:any)'] = "admin/Admin_controller/add_production_bom/$1";
 $route['production_bom_list'] = "admin/Admin_controller/production_bom_list";
 $route['production_bom_list/(:any)'] = "admin/Admin_controller/production_bom_list/$1";
