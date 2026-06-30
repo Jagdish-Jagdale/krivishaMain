@@ -45,13 +45,16 @@
                                         <?php $srNo = 1; ?>
                                         <?php foreach ($article_requistion_list as $item):
                                             $article_id = $item->article_id;
-                                            $total_qty = $this->db->select_sum('total_quantity')
-                                                ->where('article_id', $article_id)
-                                                ->where('plant_id', $this->session->userdata('assign_plant_id'))
-                                                ->where('is_deleted', '0')
-                                                ->get('tbl_article_stock_report')
-                                                ->row();
-                                                $user_plant_id = $this->session->userdata('assign_plant_id');
+                                             $assign_plant_id = $this->session->userdata('assign_plant_id');
+                                             $query_builder = $this->db->select_sum('total_quantity')
+                                                 ->where('article_id', $article_id)
+                                                 ->where('is_deleted', '0');
+                                             if ($this->session->userdata('is_admin') != '1' && !empty($assign_plant_id)) {
+                                                 $assigned_plants_arr = explode(',', $assign_plant_id);
+                                                 $query_builder->where_in('plant_id', $assigned_plants_arr);
+                                             }
+                                             $total_qty = $query_builder->get('tbl_article_stock_report')->row();
+                                             $user_plant_id = $this->session->userdata('assign_plant_id');
 
                                             ?>
                                             <tr>

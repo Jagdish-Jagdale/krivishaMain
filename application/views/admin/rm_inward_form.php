@@ -54,12 +54,12 @@
                                     value="" required>
                             </div> -->
 
-                            <!-- Supplier Name -->
+                            <!-- Party Name -->
                             <div class="form-group col-md-4 col-sm-6 col-xs-12">
                                 <label>Supplier Name<b class="require">*</b></label>
                                 <select name="supplier_name" id="supplier_name" class="form-control select2-select"
                                     required>
-                                    <option value="">Select Supplier</option>
+                                    <option value="">Select Party</option>
                                     <?php if (!empty($party_name)) {
                                         foreach ($party_name as $party_result) { ?>
                                             <option value="<?= $party_result->id ?>" <?php if (!empty($single) && $single->party_name_id == $party_result->id) { ?>selected<?php } ?>>

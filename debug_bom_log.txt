@@ -1210,3 +1210,104 @@ DB Error: Array
 Last Query: DELETE FROM `tbl_particulars_bom`
 WHERE `bom_id` = '174'
 
+--- 2026-06-30 09:17:15 ---
+Action: 1
+Post Data: Array
+(
+    [article] => demoart
+    [batch] => 0
+    [id] => 
+    [weight] => 0
+    [raw_material_one] => 0
+    [raw_material_two] => 0
+    [other_rm] => 0
+    [master_batch] => 100
+    [std_cycle_time] => 100
+    [std_weight] => 0
+    [particular_id] => Array
+        (
+            [0] => 2
+            [1] => 3
+            [2] => 4
+            [3] => 5
+            [4] => 6
+            [5] => 7
+            [6] => 8
+            [7] => 9
+            [8] => 10
+            [9] => 11
+            [10] => 12
+        )
+
+    [sub_category] => Array
+        (
+            [0] => 
+            [1] => 
+            [2] => 
+            [3] => 
+            [4] => 
+            [5] => 
+            [6] => 
+            [7] => 
+            [8] => 
+            [9] => 
+            [10] => 
+        )
+
+    [uom] => Array
+        (
+            [0] => 
+            [1] => 
+            [2] => 
+            [3] => 
+            [4] => 
+            [5] => 
+            [6] => 
+            [7] => 
+            [8] => 
+            [9] => 
+            [10] => 
+        )
+
+    [uom_id] => Array
+        (
+            [0] => 
+            [1] => 
+            [2] => 
+            [3] => 
+            [4] => 
+            [5] => 
+            [6] => 
+            [7] => 
+            [8] => 
+            [9] => 
+            [10] => 
+        )
+
+    [quantity] => Array
+        (
+            [0] => 
+            [1] => 
+            [2] => 
+            [3] => 
+            [4] => 
+            [5] => 
+            [6] => 
+            [7] => 
+            [8] => 
+            [9] => 
+            [10] => 
+        )
+
+)
+
+Insert Particulars Count: 11
+DB Error: Array
+(
+    [code] => 0
+    [message] => 
+)
+
+Last Query: DELETE FROM `tbl_particulars_bom`
+WHERE `bom_id` = 173
+

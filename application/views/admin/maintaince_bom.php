@@ -108,9 +108,9 @@
                                             }
                                             $size_trim = trim((string) $size);
                                             if ($size_trim !== '' && strcasecmp($size_trim, 'NOT APPLICABLE') !== 0) {
-                                                // if($label == 'TYPE OF MOULD'){
-                                                //     continue;
-                                                // }
+                                                if($label == 'TYPE OF MOULD'){
+                                                    continue;
+                                                }
                                                 $selected_mould = $this->Admin_model->get_selected_mould($article_id, $part_id, $label);
 
                                                 $default_uom_id = null;

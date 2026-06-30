@@ -59,9 +59,9 @@
                         </div>
 
                         <div class="form-group col-xl-3 col-lg-4 col-md-6 col-sm-12 col-xs-12">
-                            <label for="brand">Supplier Name</label>
+                            <label for="brand">Party Name</label>
                             <select class="form-control js-example-basic-multiple" name="party" id="party">
-                                <option value="" selected disabled>Select Supplier</option>
+                                <option value="" selected disabled>Select Party</option>
                                 <?php if (!empty($party)) : ?>
                                     <?php foreach ($party as $party_result) : ?>
                                         <option value="<?= $party_result->id ?>"
@@ -107,7 +107,7 @@
                                     <th>SR. NO.</th>
                                     <th>Inward Number</th>
                                     <th>Inward Date & Time</th>
-                                    <th>Supplier Name</th>
+                                    <th>Party Name</th>
                                     <th>Plant Name</th>
                                     <th>Gate Entry No.</th>
                                     <th>Gate Entry Date</th>
@@ -214,7 +214,7 @@
             "lengthMenu": [10, 25, 50, 100],
             'searching': true,
             "processing": true,
-            // "serverSide": true,
+            "serverSide": true,
             "cache": false,
             "order": [],
             "ordering": false,

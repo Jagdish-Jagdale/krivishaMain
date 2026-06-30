@@ -913,7 +913,7 @@ class Admin_controller extends CI_Controller
 		$data['articles']                 = $this->Admin_model->get_all_container_articles();
 		$data['customer_purchase_history'] = $this->Admin_model->get_printing_customer_purchase_history($from_date, $to_date, $party_id);
 		$data['printing_report_data']     = $this->Admin_model->get_printing_impression_report($from_date, $to_date, $party_id, $brand_id, $article_id);
-		$data['store_issue_report']       = $this->Admin_model->get_printing_store_issue_report($from_date, $to_date);
+		$data['store_issue_report']       = $this->Admin_model->get_printing_store_issue_report($from_date, $to_date, $party_id);
 		$this->load->view('admin/printing_report', $data);
 	}
 
@@ -1568,6 +1568,10 @@ class Admin_controller extends CI_Controller
 				$this->db->where('id', $id);
 				$task_data = $this->db->get('tbl_manual_task')->row();
 				redirect('add_order' . '?party_id=' . $this->input->post('party_id') .'&sales_person_id=' . $task_data->assign_to_id);
+			} else if($result == '4') {
+				// Logistics order - cannot close manually
+				$this->session->set_flashdata('message', 'Logistics orders cannot be closed manually. Please use the dispatch workflow with transport assignment.');
+				redirect($_SERVER['HTTP_REFERER']);
 			} else {
 				$this->session->set_flashdata('message', 'Failed to Add!');
 				redirect($_SERVER['HTTP_REFERER']);

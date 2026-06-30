@@ -300,11 +300,17 @@ if ($this->uri->segment(2) != "") {
                         var last_in_km = parseFloat(response.last_in_km) || 0;
                         $('#out_km').val(last_in_km);
                         $('#in_km').trigger('keyup');
+                        if ($.fn.valid) {
+                            $('#in_km').valid();
+                        }
                     },
                 });
             } else if ('<?= $id ?>' === '') {
                 $('#out_km').val('');
                 $('#in_km').trigger('keyup');
+                if ($.fn.valid) {
+                    $('#in_km').valid();
+                }
             }
         });
     });
@@ -374,6 +380,15 @@ if ($this->uri->segment(2) != "") {
         return this.optional(element) || /^\s/.test(value) === false;
     }, "First letter cannot be a space");
 
+    $.validator.addMethod("greaterThanOutKm", function (value, element) {
+        var out_km = parseFloat($('#out_km').val()) || 0;
+        var in_km = parseFloat(value) || 0;
+        return this.optional(element) || in_km > out_km;
+    }, function() {
+        var out_km = parseFloat($('#out_km').val()) || 0;
+        return "In Km must be greater than previous record In Km (" + out_km + ")";
+    });
+
     $(document).ready(function () {
         $('#own_vehicle_form').validate({
             ignore: [],
@@ -408,6 +423,7 @@ if ($this->uri->segment(2) != "") {
                 in_km: {
                     required: true,
                     number: true,
+                    greaterThanOutKm: true,
                 },
                 market_freight: {
                     required: true,
@@ -457,6 +473,7 @@ if ($this->uri->segment(2) != "") {
                 in_km: {
                     required: "Please enter in km!",
                     number: "Only numeric values allowed!",
+                    greaterThanOutKm: "In Km must be greater than previous record In Km!",
                 },
                 market_freight: {
                     required: "Please enter market freight!",

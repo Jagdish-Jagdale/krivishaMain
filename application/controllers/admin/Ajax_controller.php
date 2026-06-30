@@ -4025,7 +4025,7 @@ class Ajax_controller extends CI_Controller
                     $calculated_exact_km = abs($in_val - $out_val);
                 }
 
-                $diesel_rate = (float)$member->diesel_rate;
+                $diesel_rate = (float)($member->carry_forward_diesel_rate ?? $member->diesel_rate);
                 $calculated_diesel_expense = (float)$member->diesel_expense;
                 if ($calculated_diesel_expense == 0 && $calculated_exact_km > 0 && $diesel_rate > 0) {
                     // Formula derived from Excel: Exact KM / 9 * Diesel Rate

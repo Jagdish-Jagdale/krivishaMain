@@ -247,7 +247,7 @@ class Admin_model extends CI_model
 			$this->db->where('vehical_id', $vehical_id);
 		}
 
-		$this->db->select('tbl_own_vehicle_details.*, (SELECT t2.in_km FROM tbl_own_vehicle_details t2 WHERE t2.vehical_id = tbl_own_vehicle_details.vehical_id AND t2.id < tbl_own_vehicle_details.id AND t2.is_deleted = "0" ORDER BY t2.id DESC LIMIT 1) as actual_out_km');
+		$this->db->select('tbl_own_vehicle_details.*, (SELECT t2.in_km FROM tbl_own_vehicle_details t2 WHERE t2.vehical_id = tbl_own_vehicle_details.vehical_id AND t2.id < tbl_own_vehicle_details.id AND t2.is_deleted = "0" ORDER BY t2.id DESC LIMIT 1) as actual_out_km, (SELECT t3.diesel_rate FROM tbl_own_vehicle_details t3 WHERE t3.vehical_id = tbl_own_vehicle_details.vehical_id AND t3.id <= tbl_own_vehicle_details.id AND t3.diesel_topup > 0 AND t3.diesel_rate > 0 AND t3.is_deleted = "0" ORDER BY t3.id DESC LIMIT 1) as carry_forward_diesel_rate');
 		
 		$query = $this->db->get();
 		$records = $query->result();
@@ -269,7 +269,7 @@ class Admin_model extends CI_model
 				$exact_km = abs($in_val - $out_val);
 			}
 
-			$diesel_rate = (float)$member->diesel_rate;
+			$diesel_rate = (float)($member->carry_forward_diesel_rate ?? $member->diesel_rate);
 			$diesel_exp = (float)$member->diesel_expense;
 			if ($diesel_exp == 0 && $exact_km > 0 && $diesel_rate > 0) {
 				$diesel_exp = ($exact_km / 9) * $diesel_rate;
@@ -4494,8 +4494,9 @@ class Admin_model extends CI_model
 	public function get_all_supplier_party_master()
 	{
 		$this->db->where('is_deleted', '0');
-		$this->db->where_in('party_type', ['2', '3']);
-		$this->_restrict_customer_queries();
+		$this->db->where("(FIND_IN_SET('2', tbl_customers.party_type) > 0 OR FIND_IN_SET('3', tbl_customers.party_type) > 0)", null, false);
+		// Suppliers are company-wide vendors and should not be restricted by salesperson IDs for non-admin staff
+		// $this->_restrict_customer_queries();
 		$result = $this->db->get('tbl_customers');
 		return $result->result();
 	}
@@ -5864,13 +5865,37 @@ class Admin_model extends CI_model
 			'freight_status' => $this->input->post('freight_status'),
 			'remark' => $this->input->post('remark'),
 			'sub_order_id' => $sub_order_id,
-			// Save the dispatching plant — from POST field or session
-			'plant_id' => $this->input->post('dispatch_plant_id') ?: ($this->session->userdata('assign_plant_id') ?: null),
 			'updated_on' => date('Y-m-d H:i:s'),
 		);
 		$data['created_on'] = date('Y-m-d H:i:s');
+		
+		// Log the data being inserted for debugging
+		error_log("DEBUG: Inserting outward order with transport_id: " . ($data['transport_id'] ?? 'NULL') . " for order_id: " . $data['order_id']);
+		error_log("DEBUG: Full data array: " . json_encode($data));
+		
+		// Start transaction to ensure data consistency
+		$this->db->trans_start();
+		
 		$this->db->insert('tbl_outward_orders', $data);
 		$dispatch_id = $this->db->insert_id();
+		
+		// Check for database error
+		$error = $this->db->error();
+		if ($error['code'] != 0) {
+			error_log("ERROR: Database error during insert: " . $error['message']);
+			$this->db->trans_rollback();
+			return 0;
+		}
+		
+		if (!$dispatch_id) {
+			error_log("ERROR: Failed to insert into tbl_outward_orders for order_id: " . $data['order_id']);
+			$this->db->trans_rollback();
+			return 0;
+		}
+		
+		// Verify the insert
+		$inserted = $this->db->where('id', $dispatch_id)->get('tbl_outward_orders')->row();
+		error_log("DEBUG: After insert - dispatch_id: $dispatch_id, transport_id in DB: " . ($inserted->transport_id ?? 'NULL'));
 
 		$article_ids = $this->input->post('article_ids');
 		$brand_ids = $this->input->post('brand_ids');
@@ -6157,6 +6182,16 @@ class Admin_model extends CI_model
 			$this->db->insert('tbl_notifications', $notification_data);
 			$this->send_task_notification_by_token($party_data->attending_salesperson_id, $title, $description, $landing_page, $notification_according, $user_data->plant_id);
 		}
+		
+		// Complete the transaction
+		$this->db->trans_complete();
+		
+		// Check if transaction failed
+		if ($this->db->trans_status() === FALSE) {
+			error_log("ERROR: Transaction failed for order_id: " . $order_id);
+			return 0;
+		}
+		
 		return 1;
 	}
 
@@ -8784,6 +8819,9 @@ class Admin_model extends CI_model
 				LEFT JOIN tbl_transport_master ON tbl_outward_orders.transport_id = tbl_transport_master.id
 				WHERE tbl_outward_orders.order_id = tbl_auto_task_list.task_id
 					AND tbl_outward_orders.is_deleted = \'0\'
+					AND tbl_outward_orders.transport_id IS NOT NULL
+					AND tbl_outward_orders.transport_id != \'\'
+					AND tbl_outward_orders.transport_id != \'0\'
 				ORDER BY tbl_outward_orders.updated_on DESC, tbl_outward_orders.id DESC
 				LIMIT 1
 			) AS transport_name,
@@ -12547,48 +12585,49 @@ class Admin_model extends CI_model
 	}
 	public function get_all_inward_form_list($length, $start, $search)
 	{
-		$this->db->select('tbl_inward.*, tbl_customers.party_name,tbl_plant_master.plant_name');
-		$this->db->from('tbl_inward');
-		$this->db->join('tbl_customers', 'tbl_customers.id = tbl_inward.party_id', 'left');
-		$this->db->join('tbl_plant_master', 'tbl_plant_master.id = tbl_inward.plant_id', 'left');
-		$this->db->where('tbl_inward.is_deleted', '0');
-		$this->_apply_assigned_plants_scope('tbl_inward.plant_id');
+		$apply_filters = function() use ($search) {
+			$this->db->from('tbl_inward');
+			$this->db->join('tbl_customers', 'tbl_customers.id = tbl_inward.party_id', 'left');
+			$this->db->join('tbl_plant_master', 'tbl_plant_master.id = tbl_inward.plant_id', 'left');
+			$this->db->where('tbl_inward.is_deleted', '0');
+			$this->_apply_assigned_plants_scope('tbl_inward.plant_id');
 
-		if ($this->input->post('inward_for') != "") {
-			$this->db->where('tbl_inward.inward_for', $this->input->post('inward_for'));
-		}
-		if ($this->input->post('search_date') != "") {
-			$exp = explode("to", $this->input->post('search_date'));
-			if (isset($exp[0]) && isset($exp[1])) {
-				$this->db->where('DATE(tbl_inward.inward_date) >=', date("Y-m-d", strtotime($exp[0])));
-				$this->db->where('DATE(tbl_inward.inward_date) <=', date("Y-m-d", strtotime($exp[1])));
-			} else if (isset($exp[0])) {
-				$this->db->where('DATE(tbl_inward.inward_date)', date("Y-m-d", strtotime($exp[0])));
+			if ($this->input->post('inward_for') != "") {
+				$this->db->where('tbl_inward.inward_for', $this->input->post('inward_for'));
 			}
-		}
-		if ($this->input->post('party_action') != "") {
-			$this->db->where('tbl_inward.party_id', $this->input->post('party_action'));
-		}
-		if ($this->input->post('plant_id') != "") {
-			$this->db->where('tbl_inward.plant_id', $this->input->post('plant_id'));
-		}
-		if (!empty($search)) {
-			$this->apply_search_filter($search);
-		}
+			if ($this->input->post('search_date') != "") {
+				$exp = explode("to", $this->input->post('search_date'));
+				if (isset($exp[0]) && isset($exp[1])) {
+					$this->db->where('DATE(tbl_inward.inward_date) >=', date("Y-m-d", strtotime($exp[0])));
+					$this->db->where('DATE(tbl_inward.inward_date) <=', date("Y-m-d", strtotime($exp[1])));
+				} else if (isset($exp[0])) {
+					$this->db->where('DATE(tbl_inward.inward_date)', date("Y-m-d", strtotime($exp[0])));
+				}
+			}
+			if ($this->input->post('party_action') != "") {
+				$this->db->where('tbl_inward.party_id', $this->input->post('party_action'));
+			}
+			if ($this->input->post('plant_id') != "") {
+				$this->db->where('tbl_inward.plant_id', $this->input->post('plant_id'));
+			}
+			if (!empty($search)) {
+				$this->apply_search_filter($search);
+			}
+		};
 
-		// if ($length > 0) { $this->db->limit($length, $start); }
+		// 1. Data Query
+		$this->db->select('tbl_inward.*, tbl_customers.party_name, tbl_plant_master.plant_name');
+		$apply_filters();
 		$this->db->order_by('tbl_inward.id', 'DESC');
-		$query = $this->db->get();
-		$result = $query->result();
-
-		$this->db->select('COUNT(id) as total_count');
-		$this->db->from('tbl_inward');
-		$this->db->where('is_deleted', '0');
-		if (!empty($search)) {
-			$this->apply_search_filter($search);
+		if ($length > 0) { 
+			$this->db->limit($length, $start); 
 		}
-		$count_query = $this->db->get();
-		$total_count = $count_query->row()->total_count;
+		$result = $this->db->get()->result();
+
+		// 2. Count Query
+		$this->db->select('COUNT(tbl_inward.id) as total_count');
+		$apply_filters();
+		$total_count = $this->db->get()->row()->total_count ?? 0;
 
 		return [
 			'data' => $result,
@@ -12804,9 +12843,7 @@ class Admin_model extends CI_model
 		$this->db->where('tbl_machine_master.is_deleted', '0');
 		$this->db->where('tbl_machine_master.status', '1');
 		$this->db->where_in('tbl_machine_master.department_id', ['2', '3', '6', '14']);
-		if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_machine_master.plant_id', $this->session->userdata('assign_plant_id'));
-		}
+		$this->_apply_assigned_plants_scope('tbl_machine_master.plant_id');
 		$result = $this->db->get();
 		return $result->result();
 	}
@@ -14499,13 +14536,16 @@ class Admin_model extends CI_model
 		return $this->db->get()->result();
 	}
 
-	public function get_printing_store_issue_report($from_date = null, $to_date = null)
+	public function get_printing_store_issue_report($from_date = null, $to_date = null, $party_id = null)
 	{
 		$where_date = "r.is_deleted = '0'";
 		if (!empty($from_date) && !empty($to_date)) {
 			$where_date .= " AND DATE(r.created_on) >= '" . $this->db->escape_str($from_date) . "' AND DATE(r.created_on) <= '" . $this->db->escape_str($to_date) . "'";
 		} elseif (!empty($from_date)) {
 			$where_date .= " AND DATE(r.created_on) = '" . $this->db->escape_str($from_date) . "'";
+		}
+		if (!empty($party_id)) {
+			$where_date .= " AND r.party_id = '" . $this->db->escape_str($party_id) . "'";
 		}
 
 		$sql = "
@@ -14968,7 +15008,7 @@ class Admin_model extends CI_model
 		$location_id = $this->input->post('location_id');
 		$party_id = $this->input->post('party_action');
 		$vehical_id = $this->input->post('vehical_id');
-		$this->db->select('tbl_own_vehicle_details.*, tbl_vehical.vehical,tbl_location_master.city,tbl_customers.party_name, (SELECT t2.in_km FROM tbl_own_vehicle_details t2 WHERE t2.vehical_id = tbl_own_vehicle_details.vehical_id AND t2.id < tbl_own_vehicle_details.id AND t2.is_deleted = "0" ORDER BY t2.id DESC LIMIT 1) as actual_out_km');
+		$this->db->select('tbl_own_vehicle_details.*, tbl_vehical.vehical,tbl_location_master.city,tbl_customers.party_name, (SELECT t2.in_km FROM tbl_own_vehicle_details t2 WHERE t2.vehical_id = tbl_own_vehicle_details.vehical_id AND t2.id < tbl_own_vehicle_details.id AND t2.is_deleted = "0" ORDER BY t2.id DESC LIMIT 1) as actual_out_km, (SELECT t3.diesel_rate FROM tbl_own_vehicle_details t3 WHERE t3.vehical_id = tbl_own_vehicle_details.vehical_id AND t3.id <= tbl_own_vehicle_details.id AND t3.diesel_topup > 0 AND t3.diesel_rate > 0 AND t3.is_deleted = "0" ORDER BY t3.id DESC LIMIT 1) as carry_forward_diesel_rate');
 		$this->db->from('tbl_own_vehicle_details');
 		$this->db->join('tbl_vehical ', 'tbl_vehical.id = tbl_own_vehicle_details.vehical_id', 'left');
 		$this->db->join('tbl_location_master', 'tbl_location_master.id = tbl_own_vehicle_details.location_id', 'left');
@@ -17279,9 +17319,7 @@ class Admin_model extends CI_model
 		if ($this->input->post('plant_id') != "") {
 			$this->db->where('tbl_raw_material_stock_report.plant_id', $this->input->post('plant_id'));
 		}
-		if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_raw_material_stock_report.plant_id', $this->session->userdata('assign_plant_id'));
-		}
+		$this->_apply_assigned_plants_scope('tbl_raw_material_stock_report.plant_id');
 		if ($this->input->post('raw_material_id') != "") {
 			$this->db->where('tbl_raw_material_stock_report.raw_material_id', $this->input->post('raw_material_id'));
 		}
@@ -17316,9 +17354,7 @@ class Admin_model extends CI_model
 		if ($this->input->post('plant_id') != "") {
 			$this->db->where('tbl_raw_material_stock_report.plant_id', $this->input->post('plant_id'));
 		}
-		if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_raw_material_stock_report.plant_id', $this->session->userdata('assign_plant_id'));
-		}
+		$this->_apply_assigned_plants_scope('tbl_raw_material_stock_report.plant_id');
 		if ($this->input->post('raw_material_id') != "") {
 			$this->db->where('tbl_raw_material_stock_report.raw_material_id', $this->input->post('raw_material_id'));
 		}
@@ -17357,9 +17393,7 @@ class Admin_model extends CI_model
 		if ($this->input->post('plant_id') != "") {
 			$this->db->where('tbl_article_stock_report.plant_id', $this->input->post('plant_id'));
 		}
-		if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_article_stock_report.plant_id', $this->session->userdata('assign_plant_id'));
-		}
+		$this->_apply_assigned_plants_scope('tbl_article_stock_report.plant_id');
 		if ($this->input->post('article_id') != "") {
 			$this->db->where('tbl_article_stock_report.article_id', $this->input->post('article_id'));
 		}
@@ -17393,9 +17427,7 @@ class Admin_model extends CI_model
 		if ($this->input->post('plant_id') != "") {
 			$this->db->where('tbl_article_stock_report.plant_id', $this->input->post('plant_id'));
 		}
-		if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_article_stock_report.plant_id', $this->session->userdata('assign_plant_id'));
-		}
+		$this->_apply_assigned_plants_scope('tbl_article_stock_report.plant_id');
 		if ($this->input->post('article_id') != "") {
 			$this->db->where('tbl_article_stock_report.article_id', $this->input->post('article_id'));
 		}
@@ -19241,8 +19273,8 @@ class Admin_model extends CI_model
 		$this->db->where('DATE(tbl_production_schedules.date) >=', '2025-11-01');
 		if (!empty($plant_id)) {
 			$this->db->where('tbl_production_schedules.plant_id', $plant_id);
-		} else if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_production_schedules.plant_id', $this->session->userdata('assign_plant_id'));
+		} else {
+			$this->_apply_assigned_plants_scope('tbl_production_schedules.plant_id');
 		}
 		if (!empty($date)) {
 			if (strpos($date, ' to ') !== false) {
@@ -19356,8 +19388,8 @@ class Admin_model extends CI_model
 		$this->db->where('DATE(tbl_production_schedules.date) <', '2025-11-01');
 		if (!empty($plant_id)) {
 			$this->db->where('tbl_production_schedules.plant_id', $plant_id);
-		} else if ($this->session->userdata('is_admin') != '1') {
-			$this->db->where('tbl_production_schedules.plant_id', $this->session->userdata('assign_plant_id'));
+		} else {
+			$this->_apply_assigned_plants_scope('tbl_production_schedules.plant_id');
 		}
 		if (!empty($date)) {
 			if (strpos($date, ' to ') !== false) {
@@ -20220,14 +20252,13 @@ class Admin_model extends CI_model
 							END,
 							': ',
 							CASE
-								WHEN x.has_entry = 0                          THEN 'No Entry'
 								WHEN NULLIF(TRIM(x.remark_txt), '') IS NOT NULL THEN x.remark_txt
-								ELSE 'No Entry'
+								ELSE '-'
 							END
 						)
 						ELSE NULL
 					END
-					ORDER BY x.slot
+					ORDER BY FIELD(x.slot, 'eight_nine', 'nine_ten', 'ten_eleven', 'eleven_twelve', 'twelve_thirteen', 'thirteen_fourteen', 'fourteen_fifteen', 'fifteen_sixteen', 'sixteen_seventeen', 'seventeen_eighteen', 'eighteen_nineteen', 'nineteen_twenty', 'twenty_twentyone', 'twentyone_twentytwo', 'twentytwo_twentythree', 'twentythree_zero', 'zero_one', 'one_two', 'two_three', 'three_four', 'four_five', 'five_six', 'six_seven', 'seven_eight')
 					SEPARATOR '||'
 				) AS reason,
 				GROUP_CONCAT(DISTINCT NULLIF(x.remark_txt, '') SEPARATOR ' | ') AS reason_combined
@@ -20239,7 +20270,7 @@ class Admin_model extends CI_model
 					s.qty_num,
 					s.has_entry,
 					s.remark_txt,
-					(CASE WHEN s.has_entry = 0 OR (s.qty_num IS NOT NULL AND s.qty_num < 30) THEN 1 ELSE 0 END) AS is_down,
+					(CASE WHEN (s.has_entry = 1 OR s.remark_txt IS NOT NULL) AND (s.qty_num IS NULL OR s.qty_num < 30) THEN 1 ELSE 0 END) AS is_down,
 					(CASE
 						WHEN LOWER(s.remark_txt) LIKE '%mould%change%' OR LOWER(s.remark_txt) LIKE '%mold%change%'
 							OR LOWER(s.remark_txt) LIKE '%mould setting%' OR LOWER(s.remark_txt) LIKE '%mold setting%'

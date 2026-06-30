@@ -264,8 +264,15 @@
 
                                                 <?php
                                             
-                                                $total_stock_qty = $this->db->select_sum('total_quantity')->where('article_id', $sub_order_item->article_id)
-                                                        ->where('plant_id', $this->session->userdata('assign_plant_id'))->where('is_deleted', '0')->get('tbl_article_stock_report')->row();
+                                                 $assign_plant_id = $this->session->userdata('assign_plant_id');
+                                                 $query_builder = $this->db->select_sum('total_quantity')
+                                                     ->where('article_id', $sub_order_item->article_id)
+                                                     ->where('is_deleted', '0');
+                                                 if ($this->session->userdata('is_admin') != '1' && !empty($assign_plant_id)) {
+                                                     $assigned_plants_arr = explode(',', $assign_plant_id);
+                                                     $query_builder->where_in('plant_id', $assigned_plants_arr);
+                                                 }
+                                                 $total_stock_qty = $query_builder->get('tbl_article_stock_report')->row();
                                                     
                                                 $quantity_data = $this->Admin_model->get_dispatch_quantity($sub_order_item->article_id, $sub_order_item->order_id, $sub_order_item->brand_type_id);
                                                 $total_dispatch_qty = (int)$quantity_data['total_dispatch_quantity'];
@@ -278,11 +285,11 @@
                                                     $total_remaining = $approved_qty - $total_dispatch_qty;
                                                     $check_remaining_qty = $total_remaining;
                                                 }else if($total_dispatch_qty == 0 && $sub_order_item->approved_qty == 0){
-                                                    $total_remaining = '0';
-                                                    $check_remaining_qty = (int)$sub_order_item->order_quantity;
+                                                    $total_remaining = (int)$sub_order_item->order_quantity;
+                                                    $check_remaining_qty = $total_remaining;
                                                 }else{
-                                                    $total_remaining = '0';
-                                                    $check_remaining_qty = (int)$sub_order_item->approved_qty;
+                                                    $total_remaining = (int)$sub_order_item->approved_qty;
+                                                    $check_remaining_qty = $total_remaining;
                                                 }
                                                 $is_readonly = ($total_remaining == 0 && $total_dispatch_qty != 0 || $total_stock_qty->total_quantity <= 0) ? 'readonly' : '';
                                                 ?>
@@ -507,7 +514,7 @@
                 location_id: {
                     required: true,
                 },
-                transport: {
+                transport_id: {
                     required: true,
                 },
                 dispatch_plant_id: {
@@ -550,7 +557,7 @@
                     number: "Only numeric values allowed!",
                 },
                 location_id: { required: "Please select location!" },
-                transport: { required: "Please select transport!" },
+                transport_id: { required: "Please select transport!" },
                 dispatch_plant_id: { required: "Please select dispatching plant!" },
                 vehicle: { required: "Please enter vehicle name!" },
                 vehicle_no: { required: "Please enter vehicle number!" },
